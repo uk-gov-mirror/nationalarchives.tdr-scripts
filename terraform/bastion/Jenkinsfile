@@ -34,7 +34,7 @@ pipeline {
         stage('Set up Terraform workspace') {
           steps {
             echo 'Initializing Terraform...'
-            def val = sh(script: "aws ec2 describe-instances --profile integration --filters Name=instance-state-name,Values=running Name=tag:Name,Values=bastion-ec2-instance-intg   | jq -r '.Reservations[].Instances[].InstanceId'", returnStdout: true)
+            def instanceId = sh(script: """aws ec2 describe-instances --profile integration --filters Name=instance-state-name,Values=running Name=tag:Name,Values=bastion-ec2-instance-intg   | jq -r '.Reservations[].Instances[].InstanceId'""", returnStdout: true)
             sh "git clone https://github.com/nationalarchives/tdr-terraform-modules.git"
             sh 'terraform init'
             //If Terraform workspace exists continue
@@ -46,7 +46,7 @@ pipeline {
           steps {
             script {
               sh "terraform apply -auto-approve"
-              def instanceId = sh(script: "aws ec2 describe-instances --profile integration --filters Name=instance-state-name,Values=running Name=tag:Name,Values=bastion-ec2-instance-intg   | jq -r '.Reservations[].Instances[].InstanceId'", returnStdout: true)
+              def val = sh(script: """aws ec2 describe-instances --profile integration --filters Name=instance-state-name,Values=running Name=tag:Name,Values=bastion-ec2-instance-intg   | jq -r '.Reservations[].Instances[].InstanceId'""", returnStdout: true)
               tdr.postToDaTdrSlackChannel(colour: "good", message: "Bastion instance has been created")
             }
           }
