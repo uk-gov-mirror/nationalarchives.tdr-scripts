@@ -1,0 +1,64 @@
+library("tdr-jenkinslib")
+def repo = "tdr-scripts"
+
+pipeline {
+  agent {
+    label "master"
+  }
+  parameters {
+    choice(name: "STAGE", choices: ["intg", "staging", "prod"], description: "The stage you are creating the instance in")
+    choice(name: "COMMAND", choices: ["apply", "destroy"], description: "Apply will create the instance")
+  }
+  stages {
+    stage("Run git secrets") {
+      steps {
+        script {
+          tdr.runGitSecrets(repo)
+        }
+      }
+    }
+    stage('Run Terraform build') {
+      agent {
+        ecs {
+          inheritFrom 'terraform'
+          taskrole "arn:aws:iam::${env.MANAGEMENT_ACCOUNT}:role/TDRScriptsTerraformRole${params.STAGE.capitalize()}"
+        }
+      }
+      environment {
+        TF_VAR_tdr_account_number = tdr.getAccountNumberFromStage(params.STAGE)
+        //no-color option set for Terraform commands as Jenkins console unable to output the colour
+        //making output difficult to read
+        TF_CLI_ARGS="-no-color"
+      }
+      stages {
+        stage('Set up Terraform workspace') {
+          steps {
+            echo 'Initializing Terraform...'
+            def val = sh(script: "aws ec2 describe-instances --profile integration --filters Name=instance-state-name,Values=running Name=tag:Name,Values=bastion-ec2-instance-intg   | jq -r '.Reservations[].Instances[].InstanceId'", returnStdout: true)
+            sh "git clone https://github.com/nationalarchives/tdr-terraform-modules.git"
+            sh 'terraform init'
+            //If Terraform workspace exists continue
+            sh "terraform workspace new ${params.STAGE} || true"
+            sh "terraform workspace select ${params.STAGE}"
+          }
+        }
+        stage('Run terraform') {
+          steps {
+            script {
+              sh "terraform apply -auto-approve"
+              def instanceId = sh(script: "aws ec2 describe-instances --profile integration --filters Name=instance-state-name,Values=running Name=tag:Name,Values=bastion-ec2-instance-intg   | jq -r '.Reservations[].Instances[].InstanceId'", returnStdout: true)
+              tdr.postToDaTdrSlackChannel(colour: "good", message: "Bastion instance has been created")
+            }
+          }
+        }
+      }
+    }
+  }
+  post {
+    always {
+      echo 'Deleting Jenkins workspace...'
+      deleteDir()
+    }
+  }
+}
+
