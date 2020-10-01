@@ -25,3 +25,9 @@ data "aws_security_group" "db_security_group" {
     "Name" = "consignmentapi-database-bastion-security-group-${local.environment}"
   }
 }
+
+data "aws_subnet" "private_subnet" {
+  tags = {
+    "Name" = "tdr-private-subnet-0-${local.environment}"
+  }
+}
