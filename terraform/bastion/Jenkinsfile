@@ -27,7 +27,7 @@ pipeline {
       }
       environment {
         TF_VAR_tdr_account_number = tdr.getAccountNumberFromStage(params.STAGE)
-        TF_VAR_public_key = params.PUBLIC_KEY
+        TF_VAR_public_key = "${params.PUBLIC_KEY}"
         //no-color option set for Terraform commands as Jenkins console unable to output the colour
         //making output difficult to read
         TF_CLI_ARGS="-no-color"
