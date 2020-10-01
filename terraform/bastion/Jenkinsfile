@@ -22,7 +22,7 @@ pipeline {
       agent {
         ecs {
           inheritFrom 'terraform'
-          taskrole "arn:aws:iam::${env.MANAGEMENT_ACCOUNT}:role/TDRScriptsTerraformRole${params.STAGE.capitalize()}"
+          taskrole "arn:aws:iam::${env.MANAGEMENT_ACCOUNT}:role/TDRTerraformAssumeRole${params.STAGE.capitalize()}"
         }
       }
       environment {
@@ -36,20 +36,24 @@ pipeline {
         stage('Set up Terraform workspace') {
           steps {
             script {
-              echo 'Initializing Terraform...'
-              sh "git clone https://github.com/nationalarchives/tdr-terraform-modules.git"
-              sh 'terraform init'
-              //If Terraform workspace exists continue
-              sh "terraform workspace new ${params.STAGE} || true"
-              sh "terraform workspace select ${params.STAGE}"
+              dir("terraform/bastion") {
+                echo 'Initializing Terraform...'
+                sh "git clone https://github.com/nationalarchives/tdr-terraform-modules.git"
+                sh 'terraform init'
+                //If Terraform workspace exists continue
+                sh "terraform workspace new ${params.STAGE} || true"
+                sh "terraform workspace select ${params.STAGE}"
+              }
             }
           }
         }
         stage('Run terraform') {
           steps {
             script {
-              sh "terraform apply -auto-approve"
-              tdr.postToDaTdrSlackChannel(colour: "good", message: "Bastion instance has been created")
+              dir("terraform/bastion") {
+                sh "terraform apply -auto-approve"
+                tdr.postToDaTdrSlackChannel(colour: "good", message: "Bastion instance has been created")
+              }
             }
           }
         }
