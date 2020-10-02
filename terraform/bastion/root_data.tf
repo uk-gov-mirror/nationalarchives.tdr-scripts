@@ -9,20 +9,20 @@ data "aws_ami" amazon_linux_ami {
 }
 
 data "aws_ssm_parameter" "database_url" {
-  name = "/${local.environment}/consignmentapi/database/url"
+  name = "/${local.environment}/${var.service}/database/url"
 }
 
 data "aws_ssm_parameter" "database_username" {
-  name = "/${local.environment}/consignmentapi/database/username"
+  name = "/${local.environment}/${var.service}/database/username"
 }
 
 data "aws_ssm_parameter" "database_password" {
-  name = "/${local.environment}/consignmentapi/database/password"
+  name = "/${local.environment}/${var.service}/database/password"
 }
 
 data "aws_security_group" "db_security_group" {
   tags = {
-    "Name" = "consignmentapi-database-bastion-security-group-${local.environment}"
+    "Name" = "${var.service}-database-bastion-security-group-${local.environment}"
   }
 }
 

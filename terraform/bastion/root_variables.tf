@@ -14,3 +14,7 @@ variable "default_aws_region" {
 variable "public_key" {
   default = ""
 }
+
+variable "service" {
+  default = "consignmentapi"
+}

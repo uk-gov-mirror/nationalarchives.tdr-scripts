@@ -52,7 +52,7 @@ pipeline {
             script {
               dir("terraform/bastion") {
                 sh "terraform ${COMMAND} -auto-approve"
-                tdr.postToDaTdrSlackChannel(colour: "good", message: "Bastion instance has been created")
+                tdr.postToDaTdrSlackChannel(colour: "good", message: "Bastion instance has been created for the ${params.STAGE} environment")
               }
             }
           }
