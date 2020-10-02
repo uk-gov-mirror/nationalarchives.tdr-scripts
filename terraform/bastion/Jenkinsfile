@@ -1,0 +1,70 @@
+library("tdr-jenkinslib")
+def repo = "tdr-scripts"
+
+pipeline {
+  agent {
+    label "master"
+  }
+  parameters {
+    choice(name: "STAGE", choices: ["intg", "staging", "prod"], description: "The stage you are creating the instance in")
+    choice(name: "COMMAND", choices: ["apply", "destroy"], description: "Apply will create the instance")
+    text(name: "PUBLIC_KEY", description: "Public key. This is not needed if you're not going to use ssh tunnelling")
+  }
+  stages {
+    stage("Run git secrets") {
+      steps {
+        script {
+          tdr.runGitSecrets(repo)
+        }
+      }
+    }
+    stage('Run Terraform build') {
+      agent {
+        ecs {
+          inheritFrom 'terraform'
+          taskrole "arn:aws:iam::${env.MANAGEMENT_ACCOUNT}:role/TDRTerraformAssumeRole${params.STAGE.capitalize()}"
+        }
+      }
+      environment {
+        TF_VAR_tdr_account_number = tdr.getAccountNumberFromStage(params.STAGE)
+        TF_VAR_public_key = "${params.PUBLIC_KEY}"
+        //no-color option set for Terraform commands as Jenkins console unable to output the colour
+        //making output difficult to read
+        TF_CLI_ARGS="-no-color"
+      }
+      stages {
+        stage('Set up Terraform workspace') {
+          steps {
+            script {
+              dir("terraform/bastion") {
+                echo 'Initializing Terraform...'
+                sh "git clone https://github.com/nationalarchives/tdr-terraform-modules.git"
+                sh 'terraform init'
+                //If Terraform workspace exists continue
+                sh "terraform workspace new ${params.STAGE} || true"
+                sh "terraform workspace select ${params.STAGE}"
+              }
+            }
+          }
+        }
+        stage('Run terraform') {
+          steps {
+            script {
+              dir("terraform/bastion") {
+                sh "terraform ${COMMAND} -auto-approve"
+                tdr.postToDaTdrSlackChannel(colour: "good", message: "Bastion instance has been created for the ${params.STAGE} environment")
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  post {
+    always {
+      echo 'Deleting Jenkins workspace...'
+      deleteDir()
+    }
+  }
+}
+
