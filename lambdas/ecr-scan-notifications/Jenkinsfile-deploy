@@ -1,0 +1,9 @@
+
+library("tdr-jenkinslib")
+
+deployToLambda(
+    stage: "mgmt",
+    libraryName: "ecr-scan-notifications",
+    version: params.TO_DEPLOY,
+    deploymentPackageName: "scan-notifications.jar"
+)
