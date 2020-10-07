@@ -1,4 +1,4 @@
-@Library("tdr-jenkinslib@add_optional_working_directory") _
+@Library("tdr-jenkinslib@add-optional-working-directory") _
 
 lambdaTests(
     // Hard-code stage, since it is arbitrary in the lambdaTests
