@@ -24,6 +24,7 @@ lazy val root = (project in file("."))
 fork in Test := true
 javaOptions in Test += s"-Dconfig.file=${sourceDirectory.value}/test/resources/application.conf"
 
+resolvers += "TDR Releases" at "s3://tdr-releases-mgmt"
 assemblyJarName in assembly := "scan-notifications.jar"
 
 assemblyMergeStrategy in assembly := {
