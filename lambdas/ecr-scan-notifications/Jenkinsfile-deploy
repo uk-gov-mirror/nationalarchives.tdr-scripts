@@ -1,5 +1,5 @@
 
-@Library("tdr-jenkinslib@add_optional_working_directory") _
+library("tdr-jenkinslib")
 
 deployToLambda(
     stage: "mgmt",
