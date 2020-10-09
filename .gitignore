@@ -2,3 +2,5 @@
 .idea
 .terraform
 tdr-terraform-modules
+*.tfstate
+*.tfstate.backup
