@@ -42,6 +42,35 @@ If you have any conflicts with existing resources, the most likely cause is that
 someone else has run this script recently and hasn't run `terraform destroy`
 yet.
 
+Upload the Keycloak image to ECR. If you want to use the current intg image,
+download it from the mgmt account, replacing the account number in the following
+commands:
+
+```
+aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin <mgmt-account-number>.dkr.ecr.eu-west-2.amazonaws.com
+docker pull <mgmt-account-number>.dkr.ecr.eu-west-2.amazonaws.com/auth-server:intg
+```
+
+Then retag it and upload it to the Sandbox account, replacing the account
+numbers in the following commands:
+
+```
+docker tag <mgmt-account-number>.dkr.ecr.eu-west-2.amazonaws.com/auth-server:intg <sandbox-account-number>.dkr.ecr.eu-west-2.amazonaws.com/keycloak_sandbox:latest
+docker push <sandbox-account-number>.dkr.ecr.eu-west-2.amazonaws.com/keycloak_sandbox:latest
+```
+
+Alternatively, if you want to test a modified version of the Docker image, build
+it locally then tag and push it as above.
+
+Then restart the ECS service:
+
+```
+aws ecs update-service \
+  --service keycloak_service_sandbox \
+  --cluster keycloak_sandbox \
+  --force-new-deployment
+```
+
 Check the Keycloak ECS service in the AWS console to check that it has started
 up correctly. Once it has, look up the URL of the load balancer:
 

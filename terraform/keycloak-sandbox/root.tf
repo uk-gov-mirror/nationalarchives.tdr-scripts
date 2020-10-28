@@ -51,7 +51,7 @@ data "template_file" "app" {
 
   vars = {
     # Deploy the latest integration image
-    app_image                         = "nationalarchives/tdr-auth-server:intg"
+    app_image                         = "${aws_ecr_repository.ecr_repository.repository_url}:latest"
     app_port                          = 8080
     app_environment                   = var.environment
     aws_region                        = local.aws_region

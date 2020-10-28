@@ -60,4 +60,8 @@ data "aws_iam_policy_document" "keycloak_ecs_execution" {
     ]
     resources = ["arn:aws:logs:*"]
   }
+  statement {
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
 }
