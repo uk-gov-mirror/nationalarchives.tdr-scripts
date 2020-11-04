@@ -9,7 +9,7 @@ resource "aws_ecr_repository" "ecr_repository" {
 }
 
 resource "aws_ecr_repository_policy" "ecr" {
-  policy     = templatefile(
+  policy = templatefile(
     "./templates/ecr_policy.json.tpl",
     { ecs_execution_role = aws_iam_role.keycloak_ecs_execution.arn }
   )
