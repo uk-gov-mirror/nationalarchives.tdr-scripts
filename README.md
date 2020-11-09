@@ -1,10 +1,10 @@
 ## TDR Scripts
 
-This is a repository for scripts which are run infrequently and don't belong with other projects. 
+This is a repository for scripts which are run infrequently and don't belong with other projects.
 Terraform scripts are put into separate directories inside the terraform directories. Other non-terraform scripts can be organised as and when we need them.
 
 ### Bastion host creation script
-This is a terraform script to create a bastion host which can be used to connect to the database. 
+This is a terraform script to create a bastion host which can be used to connect to the database.
 Postgres client is installed when the instance is created and a .pgpass file is created to store the login credentials on the host. The host disk drive is encrypted.
 The `terraform/bastion` directory contains a Jenkinsfile for creating the bastion instance through Jenkins.
 
@@ -28,7 +28,7 @@ To setup an ssh tunnel
 host i-* mi-*
     ProxyCommand sh -c "aws ssm start-session --profile integration --target %h --document-name AWS-StartSSHSession --parameters 'portNumber=%p'"
 ```
-* Get the instance id from the instances page in the console or by running 
+* Get the instance id from the instances page in the console or by running
 `aws ec2 describe-instances --filters Name=instance-state-name,Values=running Name=tag:Name,Values=bastion-ec2-instance-intg`
 
 * Run the ssh tunnel
@@ -39,3 +39,14 @@ host i-* mi-*
 [ec2-instances]: https://eu-west-2.console.aws.amazon.com/ec2/v2/home?region=eu-west-2#Instances
 [ssh-key-pair]: https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent
 [bastion-jenkins-job]: https://jenkins.tdr-management.nationalarchives.gov.uk/job/TDR%20Bastion%20Deploy/
+
+### Keycloak Sandbox
+
+Terraform script for creating a temporary Keycloak instance in the Sandbox
+environment. This instance does not have all of the security protections used
+in the integration/staging/production version of Keycloak, so it should only be
+used for testing new Keycloak configuration.
+
+See the [Keycloak Sandbox Readme](keycloak-sandbox) for setup instructions.
+
+[keycloak-sandbox]: terraform/keycloak-sandbox/README.md
