@@ -50,3 +50,13 @@ used for testing new Keycloak configuration.
 See the [Keycloak Sandbox Readme](keycloak-sandbox) for setup instructions.
 
 [keycloak-sandbox]: terraform/keycloak-sandbox/README.md
+
+### ECR Sandbox
+
+Terraform script for creating a temporary Elastic Container Registry with image
+scanning in the Sandbox account. This is useful for testing the image scanning
+results of Docker image upgrades.
+
+See the [ECR Sandbox Readme](ecr-sandbox) for setup instructions.
+
+[ecr-sandbox]: terraform/ecr-sandbox/README.md
