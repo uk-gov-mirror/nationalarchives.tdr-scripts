@@ -31,3 +31,5 @@ data "aws_subnet" "private_subnet" {
     "Name" = "tdr-private-subnet-0-${local.environment}"
   }
 }
+
+data "aws_caller_identity" "current" {}

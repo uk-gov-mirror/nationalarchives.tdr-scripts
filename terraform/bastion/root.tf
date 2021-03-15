@@ -12,7 +12,7 @@ module "bastion_ec2_instance" {
   environment         = local.environment
   name                = "bastion"
   user_data           = "user_data_postgres"
-  user_data_variables = { db_host = data.aws_ssm_parameter.database_url.value, db_username = data.aws_ssm_parameter.database_username.value, db_password = data.aws_ssm_parameter.database_password.value }
+  user_data_variables = { db_host = data.aws_ssm_parameter.database_url.value, db_username = data.aws_ssm_parameter.database_username.value, db_password = data.aws_ssm_parameter.database_password.value, account_number = data.aws_caller_identity.current.account_id }
   ami_id              = data.aws_ami.amazon_linux_ami.id
   security_group_id   = data.aws_security_group.db_security_group.id
   kms_arn             = module.encryption_key.kms_key_arn
