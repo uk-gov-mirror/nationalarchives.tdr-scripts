@@ -37,6 +37,9 @@ pipeline {
           steps {
             script {
               dir("terraform/bastion") {
+                if(params.COMMAND == "destroy") {
+                  sh "aws ssm send-command --targets Key=tag:Name,Values=bastion-ec2-instance-${params.STAGE} --document-name deleteuser"
+                }
                 echo 'Initializing Terraform...'
                 sh "git clone https://github.com/nationalarchives/tdr-terraform-modules.git"
                 sh 'terraform init'
