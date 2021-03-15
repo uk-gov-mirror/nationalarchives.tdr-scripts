@@ -21,8 +21,8 @@ module "bastion_ec2_instance" {
 }
 
 module "bastion_delete_user_document" {
-  source = "./tdr-terraform-modules/ssm_document"
-  content_template = "bastion_delete_user"
-  document_name = "deleteuser"
+  source              = "./tdr-terraform-modules/ssm_document"
+  content_template    = "bastion_delete_user"
+  document_name       = "deleteuser"
   template_parameters = { db_host = data.aws_ssm_parameter.database_url.value, db_username = data.aws_ssm_parameter.database_username.value, db_password = data.aws_ssm_parameter.database_password.value }
 }
