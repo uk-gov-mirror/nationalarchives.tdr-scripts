@@ -26,14 +26,14 @@ pipeline {
         ecs {
           inheritFrom 'aws'
           taskrole "arn:aws:iam::${env.MANAGEMENT_ACCOUNT}:role/TDRJenkinsRunSsmRole${params.STAGE.capitalize()}"
-          stages {
-            stage('Run delete user script') {
-              steps {
-                script {
-                  def accountNumber = getAccountNumberFromStage(params.STAGE)
-                  sh "python3 run_ssm_command.py ${accountNumber} intg bastion-ec2-instance-intg deleteuser"
-                }
-              }
+        }
+      }
+      stages {
+        stage('Run delete user script') {
+          steps {
+            script {
+              def accountNumber = getAccountNumberFromStage(params.STAGE)
+              sh "python3 run_ssm_command.py ${accountNumber} intg bastion-ec2-instance-intg deleteuser"
             }
           }
         }
