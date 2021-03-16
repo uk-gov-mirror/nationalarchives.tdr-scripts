@@ -41,13 +41,13 @@ resource "aws_iam_role" "tdr_jenkins_run_ssm_document_role" {
 }
 
 resource "aws_iam_policy" "tdr_jenkins_run_ssm_document_policy" {
-  name = "TDRJenkinsRunDocumentPolicy${title(local.environment)}"
-  policy = templatefile("${path.module}/templates/run_ssm_delete_user.json.tpl", { account_id = data.aws_caller_identity.current.account_id})
+  name   = "TDRJenkinsRunDocumentPolicy${title(local.environment)}"
+  policy = templatefile("${path.module}/templates/run_ssm_delete_user.json.tpl", { account_id = data.aws_caller_identity.current.account_id })
 }
 
 resource "aws_iam_role_policy_attachment" "tdr_jenkins_run_ssm_attach" {
   policy_arn = aws_iam_policy.tdr_jenkins_run_ssm_document_policy.arn
-  role = aws_iam_role.tdr_jenkins_run_ssm_document_role.id
+  role       = aws_iam_role.tdr_jenkins_run_ssm_document_role.id
 }
 
 
