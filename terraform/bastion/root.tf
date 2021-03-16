@@ -7,23 +7,23 @@ module "encryption_key" {
 }
 
 resource "aws_iam_role" "bastion_db_connect_role" {
-  name = "TDRBastionAccessDbRole${title(local.environment)}"
-  assume_role_policy = templatefile("${path.module}/templates/bastion_access_db_assume_role.json.tpl", {account_id = data.aws_caller_identity.current.account_id, environment = title(local.environment)})
+  name               = "TDRBastionAccessDbRole${title(local.environment)}"
+  assume_role_policy = templatefile("${path.module}/templates/bastion_access_db_assume_role.json.tpl", { account_id = data.aws_caller_identity.current.account_id, environment = title(local.environment) })
 }
 
 resource "aws_iam_policy" "bastion_db_connect_policy" {
-  name = "TDRBastionAccessDbPolicy${title(local.environment)}"
-  policy = templatefile("${path.module}/templates/bastion_access_db_policy.json.tpl", {account_id = data.aws_caller_identity.current.account_id, cluster_id = data.aws_rds_cluster.consignment_api.cluster_resource_id})
+  name   = "TDRBastionAccessDbPolicy${title(local.environment)}"
+  policy = templatefile("${path.module}/templates/bastion_access_db_policy.json.tpl", { account_id = data.aws_caller_identity.current.account_id, cluster_id = data.aws_rds_cluster.consignment_api.cluster_resource_id })
 }
 
 resource "aws_iam_role_policy_attachment" "db_connect_policy_attach" {
   policy_arn = aws_iam_policy.bastion_db_connect_policy.arn
-  role = aws_iam_role.bastion_db_connect_role.id
+  role       = aws_iam_role.bastion_db_connect_role.id
 }
 
 resource "aws_iam_policy" "bastion_assume_role_policy" {
-  name = "TDRBastionAssumeDbRolePolicy${title(local.environment)}"
-  policy = templatefile("${path.module}/templates/bastion_assume_role.json.tpl", { role_arn = aws_iam_role.bastion_db_connect_role.arn})
+  name   = "TDRBastionAssumeDbRolePolicy${title(local.environment)}"
+  policy = templatefile("${path.module}/templates/bastion_assume_role.json.tpl", { role_arn = aws_iam_role.bastion_db_connect_role.arn })
 }
 
 data "aws_db_instance" "instance" {
@@ -32,7 +32,7 @@ data "aws_db_instance" "instance" {
 
 resource "aws_iam_role_policy_attachment" "bastion_assumne_db_role_attach" {
   policy_arn = aws_iam_policy.bastion_assume_role_policy.arn
-  role = module.bastion_ec2_instance.role_id
+  role       = module.bastion_ec2_instance.role_id
 }
 
 module "bastion_ec2_instance" {
