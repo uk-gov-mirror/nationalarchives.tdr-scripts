@@ -24,6 +24,10 @@ data "aws_ssm_parameter" "database_password" {
   name = "/${local.environment}/${var.service}/database/password"
 }
 
+data "aws_ssm_parameter" "mgmt_account_number" {
+  name = "/mgmt/management_account"
+}
+
 data "aws_security_group" "db_security_group" {
   tags = {
     "Name" = "${var.service}-database-bastion-security-group-${local.environment}"

@@ -18,6 +18,27 @@ pipeline {
         }
       }
     }
+    stage('Delete user if destroying bastion') {
+      when {
+        expression { params.COMMAND == "destroy" }
+      }
+      agent {
+        ecs {
+          inheritFrom 'aws'
+          taskrole "arn:aws:iam::${env.MANAGEMENT_ACCOUNT}:role/TDRJenkinsRunSsmRole${params.STAGE.capitalize()}"
+          stages {
+            stage('Run delete user script') {
+              steps {
+                script {
+                  def accountNumber = getAccountNumberFromStage(params.STAGE)
+                  sh "python3 run_ssm_command.py ${accountNumber} intg bastion-ec2-instance-intg deleteuser"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
     stage('Run Terraform build') {
       agent {
         ecs {
@@ -37,9 +58,6 @@ pipeline {
           steps {
             script {
               dir("terraform/bastion") {
-                if(params.COMMAND == "destroy") {
-                  sh "aws ssm send-command --targets Key=tag:Name,Values=bastion-ec2-instance-${params.STAGE} --document-name deleteuser"
-                }
                 echo 'Initializing Terraform...'
                 sh "git clone --single-branch --branch add-ssm-document-delete-user https://github.com/nationalarchives/tdr-terraform-modules.git"
                 sh 'terraform init'

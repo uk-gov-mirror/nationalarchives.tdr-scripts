@@ -35,6 +35,22 @@ resource "aws_iam_role_policy_attachment" "bastion_assumne_db_role_attach" {
   role       = module.bastion_ec2_instance.role_id
 }
 
+resource "aws_iam_role" "tdr_jenkins_run_ssm_document_role" {
+  name               = "TDRJenkinsRunDocumentRole${title(local.environment)}"
+  assume_role_policy = templatefile("${path.module}/templates/assume_role_policy.json.tpl", { account_id = data.aws_ssm_parameter.mgmt_account_number.value })
+}
+
+resource "aws_iam_policy" "tdr_jenkins_run_ssm_document_policy" {
+  name = "TDRJenkinsRunDocumentPolicy${title(local.environment)}"
+  policy = templatefile("${path.module}/templates/run_ssm_delete_user.json.tpl", { account_id = data.aws_caller_identity.current.account_id})
+}
+
+resource "aws_iam_role_policy_attachment" "tdr_jenkins_run_ssm_attach" {
+  policy_arn = aws_iam_policy.tdr_jenkins_run_ssm_document_policy.arn
+  role = aws_iam_role.tdr_jenkins_run_ssm_document_role.id
+}
+
+
 module "bastion_ec2_instance" {
   source              = "./tdr-terraform-modules/ec2"
   common_tags         = local.common_tags
