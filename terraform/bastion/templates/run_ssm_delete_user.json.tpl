@@ -5,7 +5,8 @@
       "Effect": "Allow",
       "Action": "ssm:SendCommand",
       "Resource": [
-        "arn:aws:ssm:eu-west-2:${account_id}:document/deleteuser"
+        "arn:aws:ssm:eu-west-2:${account_id}:document/deleteuser",
+        "arn:aws:ec2:*:*:instance/*"
       ]
     }
   ]
