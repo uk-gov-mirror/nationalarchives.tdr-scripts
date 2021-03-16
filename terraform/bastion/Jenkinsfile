@@ -32,7 +32,7 @@ pipeline {
         stage('Run delete user script') {
           steps {
             script {
-              def accountNumber = getAccountNumberFromStage(params.STAGE)
+              def accountNumber = tdr.getAccountNumberFromStage(params.STAGE)
               sh "python3 run_ssm_command.py ${accountNumber} intg bastion-ec2-instance-intg deleteuser"
             }
           }
