@@ -33,7 +33,7 @@ pipeline {
           steps {
             script {
               def accountNumber = tdr.getAccountNumberFromStage(params.STAGE)
-              sh "python3 run_ssm_command.py ${accountNumber} intg bastion-ec2-instance-intg deleteuser"
+              sh "python3 /run_ssm_command.py ${accountNumber} intg bastion-ec2-instance-intg deleteuser"
             }
           }
         }
