@@ -8,6 +8,10 @@ data "aws_ami" amazon_linux_ami {
   most_recent = true
 }
 
+data "aws_rds_cluster" "consignment_api" {
+  cluster_identifier = split(".", data.aws_ssm_parameter.database_url.value)[0]
+}
+
 data "aws_ssm_parameter" "database_url" {
   name = "/${local.environment}/${var.service}/database/url"
 }
