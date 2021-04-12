@@ -141,6 +141,15 @@ username and password you just fetched.
 
 ## Delete the instance
 
+## Setup GovUK Notify
+
+To setup GovUK Notify service update the following AWS SSM secret parameters:
+* /sandbox/keycloak/govuk_notify/api_key: this should be a GovUK Notify key that is generated specifically for use in the Sandbox
+  * **NOTE**: This Key should be deleted from the GovUK Notify service once no longer needed
+* /sandbox/keycloak/govuk_notify/template_id: this should be a GovUK Notify template id
+
+For full documentation on GovUK Notify and how to gain access, see: XXXXXX
+
 Run:
 
 ```
