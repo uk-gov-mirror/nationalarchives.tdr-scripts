@@ -139,6 +139,17 @@ aws ssm get-parameters \
 Visit the Keycloak load balancer URL again, and sign into the admin UI using the
 username and password you just fetched.
 
+## Setup GovUK Notify
+
+**Note**: this step is optional, it is only required if you need to send emails from the sandbox Keycloak instance.
+
+To setup GovUK Notify service update the following AWS SSM secret parameters:
+* /sandbox/keycloak/govuk_notify/api_key: this should be a GovUK Notify key that is generated specifically for use in the Sandbox
+  * **NOTE**: This Key should be deleted from the GovUK Notify service once no longer needed
+* /sandbox/keycloak/govuk_notify/template_id: this should be a GovUK Notify template id
+
+For full documentation on GovUK Notify and how to gain access, see: [TDR Auth Server readme](https://github.com/nationalarchives/tdr-auth-server/blob/master/README.md)
+
 ## Delete the instance
 
 Run:
