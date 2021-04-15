@@ -141,6 +141,8 @@ username and password you just fetched.
 
 ## Setup GovUK Notify
 
+**Note**: this step is optional, it is only required if you need to send emails from the sandbox Keycloak instance.
+
 To setup GovUK Notify service update the following AWS SSM secret parameters:
 * /sandbox/keycloak/govuk_notify/api_key: this should be a GovUK Notify key that is generated specifically for use in the Sandbox
   * **NOTE**: This Key should be deleted from the GovUK Notify service once no longer needed
