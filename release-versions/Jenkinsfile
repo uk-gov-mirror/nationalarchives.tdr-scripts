@@ -1,0 +1,37 @@
+library("tdr-jenkinslib")
+
+pipeline {
+  agent {
+    label "built-in"
+  }
+
+  stages {
+    stage('Generate releases page') {
+      steps {
+        script {
+          withCredentials([string(credentialsId: 'github-jenkins-api-key', variable: 'GITHUB_API_TOKEN'), string(credentialsId: 'slack-release-channel', variable: 'SLACK_URL')]) {
+            dir("release-versions") {
+              sh "python3 generate_release_file.py"
+            }
+          }
+          publishHTML (target: [
+            keepAll: true,
+            reportDir: "release-versions",
+            reportFiles: 'output.html',
+            reportName: "Release Version Report"
+          ])
+        }
+                
+      }
+    }
+  }
+  post {
+    failure {
+      script {
+        tdr.postToDaTdrSlackChannel(colour: "danger",
+          message: "*Release versions script* :warning: The script to generate release versions has failed"
+        )
+      }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 8 * * *'
+
+name: Run bastion check
+permissions:
+  id-token: write
+jobs:
+  check:
+    strategy:
+      matrix:
+        environment: ["intg", "staging", "prod"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: recursive
+          token: ${{ secrets.WORKFLOW_PAT }}
+      - id: set-environment-names
+        run: |
+          import os
+          env = "${{ matrix.environment }}"
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+            print(f"title-environment={env.title()}", file=fh)
+            print(f"account-number-secret={env.upper()}_ACCOUNT_NUMBER", file=fh)
+        shell: python
+      - id: configure-aws-credentials
+        uses: aws-actions/configure-aws-credentials@f24d7193d98baebaeacc7e2227925dd47cc267f5 # v4.2.0
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets[steps.set-environment-names.outputs.account-number-secret] }}:role/TDRGithubActionsDescribeEC2Role${{ steps.set-environment-names.outputs.title-environment }}
+          aws-region: eu-west-2
+          role-session-name: CheckBastionAge
+      - id: get-age
+        run: |
+          pip install boto3
+          python ./.github/scripts/check_ec2_instance_age.py ${{ secrets[steps.set-environment-names.outputs.account-number-secret] }} ${{ matrix.environment }} bastion-ec2-instance-${{ matrix.environment }} 1
+      - if: ${{ steps.get-age.outputs.bastion-age == 'True' }}
+        run: ./.github/scripts/run-and-approve-bastion-destroy.sh ${{ matrix.environment }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
+      - uses: nationalarchives/tdr-github-actions/.github/actions/slack-send@1c56dd1e838340ab53c7dc55dbbb974a062a6ae9 # v0.0.6
+        if: ${{ steps.get-age.outputs.bastion-age == 'True' }}
+        with:
+          message: "*Bastion delete script* The bastion for ${{ matrix.environment }} has been deleted"
+          slack-url: ${{ secrets.SLACK_WEBHOOK }}
