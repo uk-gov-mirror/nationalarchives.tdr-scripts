@@ -1,0 +1,70 @@
+name: 'Terraform plan status against dev'
+description: >
+  Checks out a repository's terraform, plans it against the dev workspace and
+  exposes a "status" output of clean, drift or error, based on
+  `terraform plan -detailed-exitcode`. Never applies anything.
+inputs:
+  repository:
+    description: 'The nationalarchives/<repo> to check out'
+    required: true
+  working-directory:
+    description: 'Directory (relative to the repo root) containing the terraform to plan'
+    required: false
+    default: '.'
+  management-account:
+    description: 'AWS management account number, used to build the role ARN to assume'
+    required: true
+  workflow-pat:
+    description: 'PAT with access to check out the target repository'
+    required: true
+  tf-var-name:
+    description: 'Optional extra TF_VAR_ environment variable name to set for the plan, e.g. tdr_account_number'
+    required: false
+    default: ''
+  tf-var-value:
+    description: 'Value for tf-var-name, if set'
+    required: false
+    default: ''
+outputs:
+  status:
+    description: 'clean, drift or error'
+    value: ${{ steps.plan.outputs.status }}
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        repository: nationalarchives/${{ inputs.repository }}
+        path: ${{ inputs.repository }}
+        submodules: recursive
+        token: ${{ inputs.workflow-pat }}
+        persist-credentials: false
+    - uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+      with:
+        role-to-assume: arn:aws:iam::${{ inputs.management-account }}:role/TDRGithubTerraformAssumeRoleDev
+        aws-region: eu-west-2
+        role-session-name: TerraformDevPlan
+    - uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4.0.0
+      with:
+        terraform_version: 1.12.2
+    - id: plan
+      shell: bash
+      working-directory: ${{ inputs.repository }}/${{ inputs.working-directory }}
+      env:
+        TF_VAR_NAME: ${{ inputs.tf-var-name }}
+        TF_VAR_VALUE: ${{ inputs.tf-var-value }}
+      run: |
+        if [ -n "$TF_VAR_NAME" ]; then
+          export "TF_VAR_${TF_VAR_NAME}=${TF_VAR_VALUE}"
+        fi
+        terraform init
+        terraform workspace select dev
+        set +e
+        terraform plan -detailed-exitcode -no-color -out=plan.out
+        exit_code=$?
+        set -e
+        case "$exit_code" in
+          0) echo "status=clean" >> "$GITHUB_OUTPUT" ;;
+          2) echo "status=drift" >> "$GITHUB_OUTPUT" ;;
+          *) echo "status=error" >> "$GITHUB_OUTPUT" ;;
+        esac
