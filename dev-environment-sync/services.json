@@ -1,0 +1,122 @@
+{
+  "comment": [
+    "Repositories deployed to the dev environment by sync_dev_environment.py.",
+    "The list is derived from the lambdas and ECS services described in the",
+    "'Creating a TDR environment from scratch' service recovery documentation.",
+    "Each entry may declare:",
+    "  repository: the GitHub repository name (required)",
+    "  workflow:   the workflow file to dispatch (defaults to deploy.yml)",
+    "  version_input: the name of the workflow input taking the version",
+    "                 (defaults to to-deploy)",
+    "  version_inputs: where a workflow takes more than one version input,",
+    "                  all of which are given the release-intg version",
+    "  extra_inputs: any additional static inputs the workflow requires",
+    "  enabled: set to false to skip the repository (see the todo field)",
+    "  deployments: for repositories which deploy more than one artefact from",
+    "               the same release tag, a list of extra_inputs/version_input",
+    "               overrides, each dispatched separately",
+    "  terraform_status_env: the name of an environment variable (set by the",
+    "                        calling workflow from a prior terraform plan job)",
+    "                        which must equal 'clean' for this service to be",
+    "                        deployed. Used for services whose deploy also",
+    "                        applies terraform, where an unrelated pending",
+    "                        plan makes an unattended apply unsafe."
+  ],
+  "ecs": [
+    {
+      "repository": "tdr-auth-server"
+    },
+    {
+      "repository": "tdr-transfer-frontend"
+    },
+    {
+      "repository": "tdr-consignment-api"
+    },
+    {
+      "repository": "tdr-consignment-export"
+    },
+    {
+      "repository": "tdr-transfer-service"
+    }
+  ],
+  "lambdas": [
+    {
+      "repository": "tdr-aggregate-processing"
+    },
+    {
+      "repository": "tdr-create-db-users",
+      "version_inputs": ["keycloak-to-deploy", "db-to-deploy"]
+    },
+    {
+      "repository": "tdr-consignment-api-data"
+    },
+    {
+      "repository": "tdr-rotate-keycloak-secrets"
+    },
+    {
+      "repository": "tdr-keycloak-user-management",
+      "version_input": "toDeploy"
+    },
+    {
+      "repository": "tdr-draft-metadata-validator",
+      "workflow": "deploy-lambda.yml",
+      "deployments": [
+        {
+          "name": "draft-metadata-checks",
+          "extra_inputs": {
+            "lambda-name": "draft-metadata-checks",
+            "deployment-package": "draft-metadata-checks.jar"
+          }
+        },
+        {
+          "name": "draft-metadata-persistence",
+          "extra_inputs": {
+            "lambda-name": "draft-metadata-persistence",
+            "deployment-package": "draft-metadata-persistence.jar"
+          }
+        }
+      ]
+    },
+    {
+      "repository": "tdr-api-update"
+    },
+    {
+      "repository": "tdr-notifications"
+    },
+    {
+      "repository": "tdr-reporting"
+    },
+    {
+      "repository": "tdr-service-unavailable"
+    },
+    {
+      "repository": "tdr-consignment-export-authoriser"
+    },
+    {
+      "repository": "tdr-redacted-files"
+    },
+    {
+      "repository": "tdr-file-checks"
+    },
+    {
+      "repository": "tdr-statuses"
+    },
+    {
+      "repository": "tdr-backend-checks-results"
+    },
+    {
+      "repository": "tdr-file-upload-data"
+    },
+    {
+      "repository": "tdr-signed-cookies"
+    },
+    {
+      "repository": "tdr-export-status-update"
+    },
+    {
+      "repository": "da-reference-generator",
+      "workflow": "tdr_deploy.yml",
+      "terraform_status_env": "REFERENCE_GENERATOR_TERRAFORM_STATUS"
+    }
+  ]
+}
