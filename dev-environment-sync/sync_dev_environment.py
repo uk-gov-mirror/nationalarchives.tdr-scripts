@@ -47,7 +47,12 @@ dry_run = os.environ.get("DRY_RUN", "false").lower() == "true"
 
 
 def url(repository, suffix):
-    return f"https://api.github.com/repos/{ORG}/{repository}/{suffix}"
+    base_url = f"https://api.github.com/repos/{ORG}/{repository}"
+
+    if suffix:
+        return f"{base_url}/{suffix}"
+
+    return base_url
 
 
 def branch_head(repository, environment):
