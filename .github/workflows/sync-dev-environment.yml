@@ -1,0 +1,20 @@
+name: Sync dev environment with intg
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Log the deployments without dispatching any workflows'
+        type: boolean
+        required: false
+        default: true
+
+permissions: {}
+
+jobs:
+  register-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "This stub registers the workflow on the default branch."
+          echo "Use --ref to dispatch the implementation from a feature branch."
