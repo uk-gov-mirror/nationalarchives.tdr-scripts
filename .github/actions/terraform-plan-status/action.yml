@@ -47,6 +47,7 @@ runs:
     - uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4.0.0
       with:
         terraform_version: 1.12.2
+        terraform_wrapper: false
     - id: plan
       shell: bash
       working-directory: ${{ inputs.repository }}/${{ inputs.working-directory }}
@@ -63,6 +64,7 @@ runs:
         terraform plan -detailed-exitcode -no-color -out=plan.out
         exit_code=$?
         set -e
+        echo "Terraform plan exit code: $exit_code"
         case "$exit_code" in
           0) echo "status=clean" >> "$GITHUB_OUTPUT" ;;
           2) echo "status=drift" >> "$GITHUB_OUTPUT" ;;
