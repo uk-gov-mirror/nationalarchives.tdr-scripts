@@ -25,6 +25,8 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 
+from deploy_exceptions import MULTI_ARTEFACT_RUN_NAME_PARSERS, sync_multi_artefact_service
+
 ORG = "nationalarchives"
 SOURCE_ENVIRONMENT = "intg"
 TARGET_ENVIRONMENT = "dev"
@@ -32,6 +34,8 @@ DEFAULT_WORKFLOW = "deploy.yml"
 DEFAULT_VERSION_INPUT = "to-deploy"
 # Pause between dispatches so we do not trip the GitHub API secondary rate limits
 DISPATCH_DELAY_SECONDS = 2
+E2E_POLL_SECONDS = 30
+E2E_TIMEOUT_SECONDS = 3600
 # Guards against deploying an ancient version from a release branch which is no
 # longer being updated by its repository's deploy workflow.
 MAX_SOURCE_AGE_DAYS = 120
@@ -106,6 +110,57 @@ def default_branch(repository):
     return response.json()["default_branch"]
 
 
+def run_e2e_tests():
+    """Dispatch one dev E2E run and return its final status."""
+    if dry_run:
+        print("  [dry run] would dispatch dev E2E tests")
+        return "not run (dry run)"
+
+    marker = f"dev-sync-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+    response = session.post(
+        url("tdr-e2e-tests", "actions/workflows/ci.yml/dispatches"),
+        json={
+            "ref": "master",
+            "inputs": {
+                "environment": TARGET_ENVIRONMENT,
+                "repo-details": marker,
+                "wait": "0",
+            },
+        },
+    )
+    if response.status_code != 204:
+        print(f"  failed to dispatch dev E2E tests: {response.status_code} {response.text}")
+        return "dispatch failed"
+
+    deadline = time.monotonic() + E2E_TIMEOUT_SECONDS
+    run = None
+    while time.monotonic() < deadline:
+        response = session.get(
+            url("tdr-e2e-tests", "actions/workflows/ci.yml/runs?event=workflow_dispatch&per_page=20")
+        )
+        response.raise_for_status()
+        runs = response.json().get("workflow_runs", [])
+        run = next((candidate for candidate in runs if marker in candidate.get("display_title", "")), None)
+        if run:
+            break
+        time.sleep(E2E_POLL_SECONDS)
+
+    if run is None:
+        print("  dev E2E tests dispatched, but the workflow run was not found before timeout")
+        return "run not found"
+
+    print(f"  dev E2E run: {run['html_url']}")
+    while time.monotonic() < deadline:
+        response = session.get(url("tdr-e2e-tests", f"actions/runs/{run['id']}"))
+        response.raise_for_status()
+        run = response.json()
+        if run["status"] == "completed":
+            return run.get("conclusion") or "completed without conclusion"
+        time.sleep(E2E_POLL_SECONDS)
+
+    return "timed out"
+
+
 def deployments_for(service):
     """A repository deploys one artefact unless it declares several."""
     return service.get("deployments", [{"name": service["repository"]}])
@@ -132,17 +187,30 @@ def sync_service(service, results):
             return
 
     intg_sha, intg_date = branch_head(repository, SOURCE_ENVIRONMENT)
-    intg_version = tag_for_sha(repository, intg_sha)
-    if intg_version is None:
-        print(f"  no release-{SOURCE_ENVIRONMENT} version found, skipping")
-        results["skipped"].append(f"{repository} (no {SOURCE_ENVIRONMENT} version)")
-        return
 
     age = datetime.now(timezone.utc) - intg_date
     if age > timedelta(days=MAX_SOURCE_AGE_DAYS):
         print(f"  release-{SOURCE_ENVIRONMENT} is {age.days} days old, skipping as it "
               f"is unlikely to be maintained by the deploy workflow")
         results["skipped"].append(f"{repository} (stale {SOURCE_ENVIRONMENT} branch, {age.days} days old)")
+        return
+
+    if repository in MULTI_ARTEFACT_RUN_NAME_PARSERS:
+        # More than one artefact is built from the same commit, tagged
+        # independently (and, for some repositories, in no guaranteed order),
+        # so a single release branch tag cannot be attributed to a specific
+        # artefact - see deploy_exceptions.py for how this is resolved instead.
+        sync_multi_artefact_service(
+            session, url, dispatch, deployments_for,
+            service, repository, workflow, results,
+            SOURCE_ENVIRONMENT, TARGET_ENVIRONMENT, DEFAULT_VERSION_INPUT
+        )
+        return
+
+    intg_version = tag_for_sha(repository, intg_sha)
+    if intg_version is None:
+        print(f"  no release-{SOURCE_ENVIRONMENT} version found, skipping")
+        results["skipped"].append(f"{repository} (no {SOURCE_ENVIRONMENT} version)")
         return
 
     dev_sha, _ = branch_head(repository, TARGET_ENVIRONMENT)
@@ -157,7 +225,8 @@ def sync_service(service, results):
     for deployment in deployments_for(service):
         name = deployment.get("name", repository)
         inputs = {"environment": TARGET_ENVIRONMENT}
-        inputs.update({name: intg_version for name in version_inputs})
+        deployed_value = intg_version[1:] if service.get("strip_v_prefix") and intg_version.startswith("v") else intg_version
+        inputs.update({version_input: deployed_value for version_input in version_inputs})
         inputs.update(service.get("extra_inputs", {}))
         inputs.update(deployment.get("extra_inputs", {}))
         if dispatch(repository, workflow, inputs):
@@ -166,7 +235,7 @@ def sync_service(service, results):
             results["failed"].append(f"{name} {intg_version}")
 
 
-def slack_message(results, terraform_warnings):
+def slack_message(results, terraform_warnings, e2e_status):
     lines = [f"*Dev environment sync* (bringing dev in line with {SOURCE_ENVIRONMENT})"]
     if results["deployed"]:
         lines.append("*Deployed:*\n" + "\n".join(f"• {item}" for item in results["deployed"]))
@@ -178,6 +247,10 @@ def slack_message(results, terraform_warnings):
         lines.append("*Skipped:*\n" + "\n".join(f"• {item}" for item in results["skipped"]))
     if terraform_warnings:
         lines.append(":warning: *Terraform:*\n" + "\n".join(f"• {item}" for item in terraform_warnings))
+    if e2e_status in ("success", "not run (dry run)"):
+        lines.append(f"*Dev E2E tests:* {e2e_status}")
+    else:
+        lines.append(f":warning: *Dev E2E tests:* {e2e_status}")
     return {"blocks": [{"type": "section", "text": {"type": "mrkdwn", "text": "\n\n".join(lines)}}]}
 
 
@@ -214,13 +287,14 @@ def main():
     for service in services["ecs"] + services["lambdas"]:
         sync_service(service, results)
 
-    message = slack_message(results, compute_terraform_warnings())
+    e2e_status = run_e2e_tests()
+    message = slack_message(results, compute_terraform_warnings(), e2e_status)
     if "SLACK_URL" in os.environ and not dry_run:
         requests.post(os.environ["SLACK_URL"], json=message)
     else:
         print(json.dumps(message, indent=2))
 
-    if results["failed"]:
+    if results["failed"] or e2e_status not in ("success", "not run (dry run)"):
         sys.exit(1)
 
 
