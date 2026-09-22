@@ -278,7 +278,23 @@ def compute_terraform_warnings():
 
 def main():
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "services.json")) as services_file:
-        services = json.load(services_file)
+def main():
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "services.json")) as services_file:
+            services = json.load(services_file)
+    except json.JSONDecodeError as e:
+        print(f"Error parsing services.json: {e}")
+        return
+    except FileNotFoundError:
+        print("services.json file not found")
+        return
+
+    results = {"deployed": [], "up_to_date": [], "failed": [], "skipped": []}
+
+    # ECS services are deployed first as the lambdas are not in the request path
+    # for the long running services.
+    for service in services["ecs"] + services["lambdas"]:
+        sync_service(service, results)
 
     results = {"deployed": [], "up_to_date": [], "failed": [], "skipped": []}
 
