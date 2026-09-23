@@ -305,7 +305,10 @@ def main():
     else:
         print(json.dumps(message, indent=2))
 
-    if results["failed"] or e2e_status not in ("success", "not run (dry run)"):
+    # A failing dev E2E run is reported above (Slack/stdout) but doesn't fail this
+    # workflow - it doesn't indicate a problem with the sync itself, and dev's E2E
+    # suite failing shouldn't be treated the same as a broken deploy dispatch.
+    if results["failed"]:
         sys.exit(1)
 
 
