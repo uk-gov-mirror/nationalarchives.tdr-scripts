@@ -13,14 +13,9 @@
     "  extra_inputs: any additional static inputs the workflow requires",
     "  enabled: set to false to skip the repository (see the todo field)",
     "  deployments: for repositories which deploy more than one artefact from",
-    "               the same release tag, a list of extra_inputs/version_input",
-    "               overrides, each dispatched separately unless single_dispatch",
-    "               is also set",
-    "  single_dispatch: set to true where the deployments must all be given as",
-    "                   inputs to one workflow dispatch, rather than one",
-    "                   dispatch per artefact (e.g. tdr-create-db-users' deploy",
-    "                   workflow requires both keycloak-to-deploy and",
-    "                   db-to-deploy together)",
+    "               the same release tag via separate workflow dispatches,",
+    "               a list of extra_inputs/version_input overrides, each",
+    "               dispatched separately (see multi_artefact.py)",
     "  terraform_status_env: the name of an environment variable (set by the",
     "                        calling workflow from a prior terraform plan job)",
     "                        which must equal 'clean' for this service to be",
@@ -55,11 +50,8 @@
     },
     {
       "repository": "tdr-create-db-users",
-      "single_dispatch": true,
-      "deployments": [
-        {"name": "keycloak-users", "version_input": "keycloak-to-deploy"},
-        {"name": "db-users", "version_input": "db-to-deploy"}
-      ]
+      "enabled": false,
+      "todo": "Deploys two lambdas (keycloak-users, db-users) from a single workflow dispatch that requires both version inputs together, resolved via ambiguous deploy-history parsing rather than a release tag. This needed the most bespoke, error-prone handling of any repository here (a 'single_dispatch' combined-inputs mode, since removed). Re-enable once there is a simpler way to sync it, e.g. splitting into two independently-dispatchable workflows."
     },
     {
       "repository": "tdr-consignment-api-data"

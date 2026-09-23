@@ -25,7 +25,7 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 
-from deploy_exceptions import MULTI_ARTEFACT_RUN_NAME_PARSERS, sync_multi_artefact_service
+from multi_artefact import MULTI_ARTEFACT_REPOSITORIES, sync_multi_artefact_service
 
 ORG = "nationalarchives"
 SOURCE_ENVIRONMENT = "intg"
@@ -187,6 +187,10 @@ def sync_service(service, results):
             return
 
     intg_sha, intg_date = branch_head(repository, SOURCE_ENVIRONMENT)
+    if intg_sha is None:
+        print(f"  no release-{SOURCE_ENVIRONMENT} branch found, skipping")
+        results["skipped"].append(f"{repository} (no {SOURCE_ENVIRONMENT} branch)")
+        return
 
     age = datetime.now(timezone.utc) - intg_date
     if age > timedelta(days=MAX_SOURCE_AGE_DAYS):
@@ -195,11 +199,11 @@ def sync_service(service, results):
         results["skipped"].append(f"{repository} (stale {SOURCE_ENVIRONMENT} branch, {age.days} days old)")
         return
 
-    if repository in MULTI_ARTEFACT_RUN_NAME_PARSERS:
+    if repository in MULTI_ARTEFACT_REPOSITORIES:
         # More than one artefact is built from the same commit, tagged
-        # independently (and, for some repositories, in no guaranteed order),
-        # so a single release branch tag cannot be attributed to a specific
-        # artefact - see deploy_exceptions.py for how this is resolved instead.
+        # independently and in no guaranteed order, so a single release
+        # branch tag cannot be attributed to a specific artefact - see
+        # multi_artefact.py for how this is resolved instead.
         sync_multi_artefact_service(
             session, url, dispatch, deployments_for,
             service, repository, workflow, results,
