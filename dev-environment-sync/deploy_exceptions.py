@@ -50,6 +50,7 @@ def deployed_version(session, url, repository, workflow, name, environment):
     named artefact, based on the deploy workflow's run history.
     """
     parse_run_name = MULTI_ARTEFACT_RUN_NAME_PARSERS[repository]
+    matching_runs = []
     page = 1
     while page <= 3:  # a few hundred runs comfortably covers recent history
         response = session.get(
@@ -65,9 +66,13 @@ def deployed_version(session, url, repository, workflow, name, environment):
                 continue
             versions, run_environment = parsed
             if run_environment == environment and name in versions:
-                return versions[name]
+                matching_runs.append((run.get("created_at") or "", run.get("id", 0), versions[name]))
         page += 1
-    return None
+
+    if not matching_runs:
+        return None
+
+    return max(matching_runs)[2]
 
 
 def sync_multi_artefact_service(session, url, dispatch, deployments_for,
