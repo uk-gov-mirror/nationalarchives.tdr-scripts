@@ -58,10 +58,13 @@ runs:
         if [ -n "$TF_VAR_NAME" ]; then
           export "TF_VAR_${TF_VAR_NAME}=${TF_VAR_VALUE}"
         fi
-        terraform init
+        terraform init > /dev/null
         terraform workspace select dev
         set +e
-        terraform plan -detailed-exitcode -no-color -out=plan.out
+        # Only the exit code is used to determine drift/error status below, so the
+        # plan output (which can include unmasked resource attributes, e.g. from
+        # random_uuid) is discarded rather than printed to this public repo's logs.
+        terraform plan -detailed-exitcode -no-color -out=plan.out > /dev/null
         exit_code=$?
         set -e
         echo "Terraform plan exit code: $exit_code"
