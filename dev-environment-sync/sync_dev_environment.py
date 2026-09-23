@@ -277,8 +277,6 @@ def compute_terraform_warnings():
 
 
 def main():
-    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "services.json")) as services_file:
-def main():
     try:
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "services.json")) as services_file:
             services = json.load(services_file)
