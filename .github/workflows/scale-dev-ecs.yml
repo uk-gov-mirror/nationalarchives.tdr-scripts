@@ -1,0 +1,81 @@
+name: Scale dev ECS services
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Scale the dev ECS services up (desired count 1) or down (desired count 0)'
+        type: choice
+        required: true
+        options:
+          - up
+          - down
+  schedule:
+    # Scale up shortly after the dev environment sync (which runs at 05:00
+    # BST/04:00 GMT), so freshly deployed images are pulled when tasks start.
+    - cron: '10 4 * * 1-5' # 05:10 BST / 04:10 GMT, weekdays
+    # Scale down each weekday evening once working hours are over.
+    - cron: '0 18 * * 1-5' # 19:00 BST / 18:00 GMT, weekdays
+permissions: {}
+jobs:
+  determine-action:
+    runs-on: ubuntu-latest
+    outputs:
+      action: ${{ steps.action.outputs.action }}
+    steps:
+      - id: action
+        env:
+          DISPATCH_ACTION: ${{ inputs.action }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [ -n "$DISPATCH_ACTION" ]; then
+            echo "action=$DISPATCH_ACTION" >> "$GITHUB_OUTPUT"
+          elif [ "$SCHEDULE" = "10 4 * * 1-5" ]; then
+            echo "action=up" >> "$GITHUB_OUTPUT"
+          else
+            echo "action=down" >> "$GITHUB_OUTPUT"
+          fi
+
+  scale:
+    needs: determine-action
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        service:
+          - { cluster: frontend_dev, name: frontend_service_dev }
+          - { cluster: keycloak_dev, name: keycloak_service_dev }
+          - { cluster: consignmentapi_dev, name: consignmentapi_service_dev }
+          - { cluster: transferservice_dev, name: transferservice_service_dev }
+    steps:
+      - uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.DEV_ACCOUNT_NUMBER }}:role/TDRGitHubECSUpdateRoleDev
+          aws-region: eu-west-2
+          role-session-name: ScaleDevEcs
+      - name: Set desired count
+        env:
+          ACTION: ${{ needs.determine-action.outputs.action }}
+          CLUSTER: ${{ matrix.service.cluster }}
+          SERVICE: ${{ matrix.service.name }}
+        run: |
+          if [ "$ACTION" = "up" ]; then
+            desired_count=1
+          else
+            desired_count=0
+          fi
+          aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --desired-count "$desired_count" --output text --query 'service.serviceName'
+
+  notify:
+    needs:
+      - determine-action
+      - scale
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: nationalarchives/tdr-github-actions/.github/actions/slack-send@8f8b90556173b43554c22d6b5f192fe9f26ad8ab # v0.0.36
+        if: needs.scale.result != 'success'
+        with:
+          message: ":warning: Failed to scale dev ECS services ${{ needs.determine-action.outputs.action }} (see the workflow run for details)"
+          slack-url: ${{ secrets.SLACK_WEBHOOK }}
