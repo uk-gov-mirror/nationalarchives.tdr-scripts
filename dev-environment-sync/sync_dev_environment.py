@@ -294,13 +294,6 @@ def main():
     for service in services["ecs"] + services["lambdas"]:
         sync_service(service, results)
 
-    results = {"deployed": [], "up_to_date": [], "failed": [], "skipped": []}
-
-    # ECS services are deployed first as the lambdas are not in the request path
-    # for the long running services.
-    for service in services["ecs"] + services["lambdas"]:
-        sync_service(service, results)
-
     e2e_status = run_e2e_tests()
     message = slack_message(results, compute_terraform_warnings(), e2e_status)
     if "SLACK_URL" in os.environ and not dry_run:
