@@ -1,82 +1,81 @@
-name: Sync dev environment with intg
+name: Scale dev ECS services
 on:
   workflow_dispatch:
     inputs:
-      dry-run:
-        description: 'Log the deployments without dispatching any workflows'
-        type: boolean
-        required: false
-        default: false
+      action:
+        description: 'Scale the dev ECS services up (desired count 1) or down (desired count 0)'
+        type: choice
+        required: true
+        options:
+          - up
+          - down
   schedule:
-    - cron: '0 4 * * *' # 05:00 BST / 04:00 GMT
+    # Scale up shortly after the dev environment sync (which runs at 05:00
+    # BST/04:00 GMT), so freshly deployed images are pulled when tasks start.
+    - cron: '10 4 * * 1-5' # 05:10 BST / 04:10 GMT, weekdays
+    # Scale down each weekday evening once working hours are over.
+    - cron: '0 18 * * 1-5' # 19:00 BST / 18:00 GMT, weekdays
 permissions: {}
 jobs:
-  # These two jobs plan (but never apply) terraform against dev, so drift can
-  # be surfaced in the sync summary without ever applying infrastructure
-  # changes unattended. da-reference-generator is checked separately as its
-  # deploy workflow applies its own terraform alongside the lambda deploy, so
-  # that repository's deploy is skipped below if this plan isn't clean.
-  terraform-plan-dev-environment:
+  determine-action:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     outputs:
-      status: ${{ steps.plan.outputs.status }}
+      action: ${{ steps.action.outputs.action }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-      - id: plan
-        uses: ./.github/actions/terraform-plan-status
-        with:
-          repository: tdr-terraform-environments
-          management-account: ${{ secrets.MANAGEMENT_ACCOUNT }}
-          workflow-pat: ${{ secrets.WORKFLOW_PAT }}
-          tf-var-name: tdr_account_number
-          tf-var-value: ${{ secrets.DEV_ACCOUNT_NUMBER }}
-
-  terraform-plan-reference-generator:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    outputs:
-      status: ${{ steps.plan.outputs.status }}
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-      - id: plan
-        uses: ./.github/actions/terraform-plan-status
-        with:
-          repository: da-reference-generator
-          working-directory: terraform
-          management-account: ${{ secrets.MANAGEMENT_ACCOUNT }}
-          workflow-pat: ${{ secrets.WORKFLOW_PAT }}
-          tf-var-name: hosting_project
-          tf-var-value: tdr
-
-  sync:
-    runs-on: ubuntu-latest
-    needs:
-      - terraform-plan-dev-environment
-      - terraform-plan-reference-generator
-    if: always()
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: '3.12'
-      - run: |
-          cd dev-environment-sync
-          pip install -r requirements.txt
-          python sync_dev_environment.py
+      - id: action
         env:
-          GITHUB_API_TOKEN: ${{ secrets.WORKFLOW_PAT }}
-          SLACK_URL: ${{ secrets.SLACK_WEBHOOK }}
-          DRY_RUN: ${{ inputs.dry-run }}
-          DEV_ENVIRONMENT_TERRAFORM_STATUS: ${{ needs.terraform-plan-dev-environment.outputs.status || 'error' }}
-          REFERENCE_GENERATOR_TERRAFORM_STATUS: ${{ needs.terraform-plan-reference-generator.outputs.status || 'error' }}
+          DISPATCH_ACTION: ${{ inputs.action }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [ -n "$DISPATCH_ACTION" ]; then
+            echo "action=$DISPATCH_ACTION" >> "$GITHUB_OUTPUT"
+          elif [ "$SCHEDULE" = "10 4 * * 1-5" ]; then
+            echo "action=up" >> "$GITHUB_OUTPUT"
+          else
+            echo "action=down" >> "$GITHUB_OUTPUT"
+          fi
+
+  scale:
+    needs: determine-action
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      matrix:
+        service:
+          - { cluster: frontend_dev, name: frontend_service_dev }
+          - { cluster: keycloak_dev, name: keycloak_service_dev }
+          - { cluster: consignmentapi_dev, name: consignmentapi_service_dev }
+          - { cluster: transferservice_dev, name: transferservice_service_dev }
+    steps:
+      - uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.DEV_ACCOUNT_NUMBER }}:role/TDRGitHubECSUpdateRoleDev
+          aws-region: eu-west-2
+          role-session-name: ScaleDevEcs
+      - name: Set desired count
+        env:
+          ACTION: ${{ needs.determine-action.outputs.action }}
+          CLUSTER: ${{ matrix.service.cluster }}
+          SERVICE: ${{ matrix.service.name }}
+        run: |
+          if [ "$ACTION" = "up" ]; then
+            desired_count=1
+          else
+            desired_count=0
+          fi
+          aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --desired-count "$desired_count" --output text --query 'service.serviceName'
+
+  notify:
+    needs:
+      - determine-action
+      - scale
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: nationalarchives/tdr-github-actions/.github/actions/slack-send@8f8b90556173b43554c22d6b5f192fe9f26ad8ab # v0.0.36
+        if: needs.scale.result != 'success'
+        with:
+          message: ":warning: Failed to scale dev ECS services ${{ needs.determine-action.outputs.action }} (see the workflow run for details)"
+          slack-url: ${{ secrets.SLACK_WEBHOOK }}
