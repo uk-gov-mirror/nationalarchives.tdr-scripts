@@ -7,3 +7,4 @@ tdr-terraform-modules
 terraform.tfstate.d
 target
 venv
+__pycache__
