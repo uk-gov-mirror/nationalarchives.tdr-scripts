@@ -82,6 +82,11 @@ def sync_multi_artefact_service(session, url, dispatch, deployments_for,
     each artefact's version from deploy history rather than a release tag.
     """
     to_deploy = []
+    # For single_dispatch services every deployment's version_input must be
+    # present in the one dispatch (the workflow requires them all together),
+    # so this tracks every resolvable deployment, not just the changed ones.
+    all_resolved = []
+    changed = False
     for deployment in deployments_for(service):
         name = deployment["name"]
         version_input = deployment.get("version_input", default_version_input)
@@ -94,20 +99,27 @@ def sync_multi_artefact_service(session, url, dispatch, deployments_for,
         if source_version == target_version:
             print(f"  {name}: already at {source_version}")
             results["up_to_date"].append(name)
-            continue
-        to_deploy.append((deployment, name, version_input, source_version, target_version))
-
-    if not to_deploy:
-        return
+        else:
+            changed = True
+            to_deploy.append((deployment, name, version_input, source_version, target_version))
+        all_resolved.append((deployment, name, version_input, source_version, target_version))
 
     if service.get("single_dispatch"):
         # All artefacts are deployed by one workflow run which requires every
         # version input at once (e.g. tdr-create-db-users' deploy workflow
         # takes both keycloak-to-deploy and db-to-deploy together), so they
-        # must be combined into a single dispatch.
+        # must be combined into a single dispatch - including any artefact
+        # that is already up to date, otherwise its required input is missing.
+        if not changed:
+            return
+        if len(all_resolved) != len(deployments_for(service)):
+            # At least one deployment's source version couldn't be resolved;
+            # dispatching would omit a required input, so skip entirely.
+            results["skipped"].append(f"{repository} (single_dispatch missing a resolved version)")
+            return
         inputs = {"environment": target_environment}
         inputs.update(service.get("extra_inputs", {}))
-        for deployment, name, version_input, source_version, target_version in to_deploy:
+        for deployment, name, version_input, source_version, target_version in all_resolved:
             inputs[version_input] = source_version
             inputs.update(deployment.get("extra_inputs", {}))
         if dispatch(repository, workflow, inputs):
@@ -118,6 +130,9 @@ def sync_multi_artefact_service(session, url, dispatch, deployments_for,
                 results["failed"].append(f"{name} {source_version}")
         return
 
+    if not to_deploy:
+        return
+
     for deployment, name, version_input, source_version, target_version in to_deploy:
         inputs = {"environment": target_environment, version_input: source_version}
         inputs.update(service.get("extra_inputs", {}))
@@ -126,3 +141,4 @@ def sync_multi_artefact_service(session, url, dispatch, deployments_for,
             results["deployed"].append(f"{name} {target_version or 'untagged'} -> {source_version}")
         else:
             results["failed"].append(f"{name} {source_version}")
+
