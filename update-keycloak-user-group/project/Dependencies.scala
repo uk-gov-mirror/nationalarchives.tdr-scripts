@@ -1,4 +1,4 @@
-import sbt._
+import sbt.*
 
 object Dependencies {
   private val keycloakVersion = "16.1.1"
